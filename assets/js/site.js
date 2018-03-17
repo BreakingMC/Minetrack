@@ -5,19 +5,12 @@ var historyPlot;
 var displayedGraphData;
 var hiddenGraphData = [];
 
-var mcVersions = {
-    'PC': {
-        4: '1.7.2',
-        5: '1.7.10',
-        47: '1.8',
-        107: '1.9'
-    }
-};
-
 var isConnected = false;
 
 var mojangServicesUpdater;
 var sortServersTask;
+
+var currentServerHover;
 
 function updateServerStatus(lastEntry) {
     var info = lastEntry.info;
@@ -29,7 +22,8 @@ function updateServerStatus(lastEntry) {
         var versions = '';
 
         for (var i = 0; i < lastEntry.versions.length; i++) {
-            versions += '<span class="version">' + mcVersions[lastEntry.info.type][lastEntry.versions[i]] + '</span>&nbsp;';
+            if (!lastEntry.versions[i]) continue;
+            versions += '<span class="version">' + publicConfig.minecraftVersions[lastEntry.info.type][lastEntry.versions[i]] + '</span>&nbsp;';
         }
 
         versionDiv.html(versions);
@@ -39,7 +33,7 @@ function updateServerStatus(lastEntry) {
 
     if (lastEntry.result) {
         var result = lastEntry.result;
-        var newStatus = 'Players: ' + formatNumber(result.players.online);
+        var newStatus = 'Players: <span style="font-weight: 500;">' + formatNumber(result.players.online) + '</span>';
 
         var listing = graphs[lastEntry.info.name].listing;
 
@@ -79,6 +73,12 @@ function updateServerStatus(lastEntry) {
 
     $("#stat_totalPlayers").text(formatNumber(totalPlayers));
     $("#stat_networks").text(formatNumber(keys.length));
+
+    if (lastEntry.record) {
+        $('#record_' + safeName(info.name)).html('Record: ' + formatNumber(lastEntry.record));
+    }
+
+    updatePercentageBar();
 }
 
 function sortServers() {
@@ -103,8 +103,7 @@ function sortServers() {
             });
 
             for (var x = 0; x < keys.length; x++) {
-                $('#' + safeName(keys[x])).appendTo('#server-container-' + categories[i]);
-
+                $('#container_' + safeName(keys[x])).appendTo('#server-container-' + categories[i]);
                 $('#ranking_' + safeName(keys[x])).text('#' + (x + 1));
             }
         }
@@ -122,11 +121,70 @@ function sortServers() {
         });
 
         for (var i = 0; i < serverNames.length; i++) {
-            $('#' + safeName(serverNames[i])).appendTo('#server-container-all');
-
+            $('#container_' + safeName(serverNames[i])).appendTo('#server-container-all');
             $('#ranking_' + safeName(serverNames[i])).text('#' + (i + 1));
         }
     }
+}
+
+function updatePercentageBar() {
+    var keys = Object.keys(lastPlayerEntries);
+
+    keys.sort(function(a, b) {
+        return lastPlayerEntries[a] - lastPlayerEntries[b];
+    });
+
+    var totalPlayers = getCurrentTotalPlayers();
+
+    var parent = $('#perc-bar');
+    var leftPadding = 0;
+
+    for (var i = 0; i < keys.length; i++) {
+        (function(pos, server, length) {
+            var safeNameCopy = safeName(server);
+            var playerCount = lastPlayerEntries[server];
+
+            var div = $('#perc_bar_part_' + safeNameCopy);
+
+            // Setup the base
+            if (!div.length) {
+                $('<div/>', {
+                    id: 'perc_bar_part_' + safeNameCopy,
+                    class: 'perc-bar-part',
+                    html: '',
+                    style: 'background: ' + getServerColor(server) + ';'
+                }).appendTo(parent);
+
+                div = $('#perc_bar_part_' + safeNameCopy);
+
+                div.mouseover(function(e) {
+                    currentServerHover = server;
+                });
+
+                div.mouseout(function(e) {
+                    hideTooltip();
+                    currentServerHover = undefined;
+                });
+            }
+
+            // Update our position/width
+            var width = (playerCount / totalPlayers) * parent.width();
+
+            div.css({
+                width: width + 'px',
+                left: leftPadding + 'px'
+            });
+
+            leftPadding += width;
+        })(i, keys[i], keys.length);
+    }
+}
+
+function getCurrentTotalPlayers() {
+    var totalPlayers = 0;
+    var keys = Object.keys(lastPlayerEntries);
+    for (var i = 0; i < keys.length; i++) totalPlayers += lastPlayerEntries[keys[i]]
+    return totalPlayers;
 }
 
 function setAllGraphVisibility(visible) {
@@ -189,11 +247,18 @@ function validateBootTime(bootTime, socket) {
             if (xhr.status === 200) {
                 validateBootTime(publicConfig.bootTime, socket);
             } else {
-                $('#tagline').attr('class', 'status-offline');
-                $('#tagline-text').text('Failed to update! Refresh?');
+                showCaption('Failed to update! Refresh?');
             }
         });
     }
+}
+
+function printPort(port) {
+  if(port == undefined || port == 25565) {
+    return "";
+  } else {
+    return ":" + port;
+  }
 }
 
 $(document).ready(function() {
@@ -211,8 +276,9 @@ $(document).ready(function() {
         if (mojangServicesUpdater) clearInterval(mojangServicesUpdater);
         if (sortServersTask) clearInterval(sortServersTask);
 
-        $('#tagline').attr('class', 'status-offline');
-        $('#tagline-text').text('Disconnected! Refresh?');
+        lastMojangServiceUpdate = undefined;
+
+        showCaption('Disconnected! Refresh?');
 
         lastPlayerEntries = {};
         graphs = {};
@@ -225,7 +291,9 @@ $(document).ready(function() {
         $('#big-graph-checkboxes').html('');
         $('#big-graph-controls').css('display', 'none');
 
-        $('#category-controller').css('display', 'none');
+        $('#perc-bar').html('');
+        $('.mojang-status').css('background', 'transparent');
+        $('.mojang-status-text').text('...');
 
         $("#stat_totalPlayers").text(0);
         $("#stat_networks").text(0);
@@ -313,10 +381,6 @@ $(document).ready(function() {
     });
 
 	socket.on('add', function(servers) {
-        if (Object.keys(publicConfig.categories).length > 1) {
-            $('#category-controller').css('display', 'block');
-        }
-
         for (var i = 0; i < servers.length; i++) {
             var history = servers[i];
             var listing = [];
@@ -340,22 +404,27 @@ $(document).ready(function() {
                 lastPlayerEntries[info.name] = lastEntry.result.players.online;
             }
 
+            var typeString = publicConfig.serverTypesVisible ? '<span class="type">' + info.type + '</span>' : '';
+
+            var safeNameCopy = safeName(info.name);
+
             $('<div/>', {
-                id: safeName(info.name),
+                id: 'container_' + safeNameCopy,
                 class: 'server',
-                html: '<div id="server-' + safeName(info.name) + '" class="column" style="width: 80px;">\
-                            <img id="favicon_' + safeName(info.name) + '">\
+                'server-id': safeNameCopy,
+                html: '<div id="server-' + safeNameCopy + '" class="column" style="width: 80px;">\
+                            <img id="favicon_' + safeNameCopy + '" title="' + info.name + '\n' + info.ip + printPort(info.port) + '">\
                             <br />\
-                            <p class="text-center-align rank" id="ranking_' + safeName(info.name) + '"></p>\
+                            <p class="text-center-align rank" id="ranking_' + safeNameCopy + '"></p>\
                         </div>\
                         <div class="column" style="width: 220px;">\
-                            <h3>' + info.name + '&nbsp;<span class="type">' + info.type + '</span></h3>\
-                            <span class="color-gray url">' + info.ip + '</span>\
-                            <div id="version_' + safeName(info.name) + '" class="versions"><span class="version"></span></div>\
-                            <span id="status_' + safeName(info.name) + '">Waiting</span>\
+                            <h3>' + info.name + '&nbsp;' + typeString + '</h3>\
+                            <span id="status_' + safeNameCopy + '">Waiting</span>\
+                            <div id="version_' + safeNameCopy + '" class="color-dark-gray server-meta versions"><span class="version"></span></div>\
+                            <span id="record_' + safeNameCopy + '" class="color-dark-gray server-meta"></span>\
                         </div>\
                         <div class="column" style="float: right;">\
-                            <div class="chart" id="chart_' + safeName(info.name) + '"></div>\
+                            <div class="chart" id="chart_' + safeNameCopy + '"></div>\
                         </div>'
             }).appendTo("#server-container-" + getServerByIp(info.ip).category);
 
@@ -369,15 +438,16 @@ $(document).ready(function() {
 
             graphs[lastEntry.info.name] = {
                 listing: listing,
-                plot: $.plot('#chart_' + safeName(info.name), [listing], smallChartOptions)
+                plot: $.plot('#chart_' + safeNameCopy, [listing], smallChartOptions)
             };
 
             updateServerStatus(lastEntry);
 
-            $('#chart_' + safeName(info.name)).bind('plothover', handlePlotHover);
+            $('#chart_' + safeNameCopy).bind('plothover', handlePlotHover);
         }
 
         sortServers();
+        updatePercentageBar();
 	});
 
 	socket.on('update', function(update) {
@@ -415,6 +485,14 @@ $(document).ready(function() {
         }
     });
 
+    socket.on('syncComplete', function(data) {
+        hideCaption();
+
+        $(document).on('click', '.server', function(e) {
+            var serverId = $(this).attr('server-id');
+        });
+    });
+
     $(document).on('click', '.graph-control', function(e) {
         var serverIp = $(this).attr('data-target-network');
         var checked = $(this).attr('checked');
@@ -441,6 +519,25 @@ $(document).ready(function() {
             resetGraphControls();
         } else {
             saveGraphControls(Object.keys(displayedGraphData));
+        }
+    });
+
+    $(document).on('mousemove', function(e) {
+        if (currentServerHover) {
+            var totalPlayers = getCurrentTotalPlayers();
+            var playerCount = lastPlayerEntries[currentServerHover];
+
+            renderTooltip(e.pageX + 10, e.pageY + 10, '<strong>' + currentServerHover + '</strong>: ' + roundToPoint(playerCount / totalPlayers * 100, 10) + '% of ' + formatNumber(totalPlayers) + ' tracked players.<br />(' + formatNumber(playerCount) + ' online.)');
+        }
+    });
+
+    $(window).on('resize', function() {
+        updatePercentageBar();
+
+        if (historyPlot) {
+            historyPlot.resize();
+            historyPlot.setupGrid();
+            historyPlot.draw();
         }
     });
 });

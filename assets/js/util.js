@@ -8,6 +8,25 @@ var publicConfig;
 var createdCategories = false;
 var categoriesVisible;
 
+var colorsByStatus = {
+    'Online': '#87D37C',
+    'Unstable': '#f1c40f',
+    'Offline': '#DE5749'
+};
+
+function showCaption(html) {
+    var tagline = $('#tagline-text');
+    tagline.stop(true, false);
+    tagline.html(html);
+    tagline.slideDown(100);
+}
+
+function hideCaption() {
+    var tagline = $('#tagline-text');
+    tagline.stop(true, false);
+    tagline.slideUp(100);
+}
+
 function setPublicConfig(json) {
     publicConfig = json;
 
@@ -16,16 +35,13 @@ function setPublicConfig(json) {
     createdCategories = false;
 
     createCategories();
-    setCategoriesVisible(publicConfig.categoriesVisible);
-}
 
-function setCategoriesVisible(newCategoriesVisible) {
-    categoriesVisible = newCategoriesVisible;
+    if (publicConfig.categoriesVisible) {
+    	$('.category-header').css('display', 'block');
+	    $('.server-container').css('margin', '10px auto');
 
-    $('.category-header').css('display', (categoriesVisible ? 'block' : 'none'));
-    $('.server-container').css('margin', (categoriesVisible ? '10px auto' : '0 auto'));
-
-    sortServers();
+	    sortServers();
+    }
 }
 
 function createCategories() {
@@ -60,14 +76,28 @@ function getServersByCategory() {
 	return byCategory;
 }
 
-function getServerByIp(ip) {
+function getServerByField(id, value) {
 	for (var i = 0; i < publicConfig.servers.length; i++) {
 		var entry = publicConfig.servers[i];
 
-		if (entry.ip === ip) {
+		if (entry[id] === value) {
 			return entry;
 		}
 	}
+}
+
+function getServerByIp(ip) {
+	return getServerByField('ip', ip);
+}
+
+function getServerByName(name) {
+	return getServerByField('name', name);
+}
+
+function getServerColor(name) {
+	var server = getServerByName(name);
+
+	return server ? server.color : stringToColor(name);
 }
 
 // Generate (and set) the HTML that displays Mojang status.
@@ -82,42 +112,15 @@ function updateMojangServices(currentUpdate) {
     	return;
     }
 
-	var keys = Object.keys(lastMojangServiceUpdate);
-    var newStatus = 'Mojang Services: ';
-
-    var serviceCountByType = {
-        Online: 0,
-        Unstable: 0,
-        Offline: 0
-    };
+    var keys = Object.keys(lastMojangServiceUpdate);
 
     for (var i = 0; i < keys.length; i++) {
-        var entry = lastMojangServiceUpdate[keys[i]];
+        var key = keys[i];
+        var status = lastMojangServiceUpdate[key];
 
-        serviceCountByType[entry.title] += 1;
+        $('#mojang-status_' + status.name).css({background: colorsByStatus[status.title]});
+        $('#mojang-status-text_' + status.name).text(status.title);
     }
-
-    if (serviceCountByType['Online'] === keys.length) {
-        $('#tagline').attr('class', 'status-online');
-
-        newStatus += 'All systems operational.';
-    } else {
-        if (serviceCountByType['Unstable'] > serviceCountByType['Offline']) {
-            $('#tagline').attr('class', 'status-unstable');
-        } else {
-            $('#tagline').attr('class', 'status-offline');
-        }
-
-        for (var i = 0; i < keys.length; i++) {
-            var entry = lastMojangServiceUpdate[keys[i]];
-
-            if (entry.startTime) {
-                newStatus += entry.name + ' ' + entry.title.toLowerCase() + ' for ' + msToTime((new Date()).getTime() - entry.startTime + ' ');
-            }
-        }
-    }
-
-	$('#tagline-text').text(newStatus);
 }
 
 function findErrorMessage(error) {
@@ -196,6 +199,10 @@ function stringToColor(base) {
     color = Math.floor(Math.abs((Math.sin(hash) * 10000) % 1 * 16777216)).toString(16);
 
     return '#' + Array(6 - color.length + 1).join('0') + color;
+}
+
+function roundToPoint(val, scale) {
+    return Math.round(val * scale) / scale;
 }
 
 function msToTime(timer) {

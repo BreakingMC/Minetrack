@@ -5,6 +5,7 @@
 	<head>
 
 		<link rel="stylesheet" type="text/css" href="css/main.css">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css">
 
 		<link rel="icon" type="image/png" href="/images/compass.png">
 
@@ -20,28 +21,19 @@
 
 			<div id="header">
 
-				<div id="column-center">
+				<div id="header-wrapper">
 
-					<div class="column">
+					<div class="column" style="padding: 20px;">
 
-						<h1 class="text-uppercase">Minetrack</h1>
-						<p class="slogan text-uppercase">All your favorite Minecraft servers, right now.</p>
+						<img src="/images/compass.png" width="28" height="28" style="display: inline-block; margin-right: 5px;">
+						<h1 style="display: inline-block;" class="text-uppercase">Minetrack</h1>
 						<p class="subslogan text-uppercase">Watching <span id="stat_totalPlayers">0</span> players on <span id="stat_networks">0</span> networks.</p>
 
 					</div>
 
-					<div class="column">
+					<div id="mojang-status-list" class="column" style="float: right;">
 
-						<p class="text-uppercase">Source code available on <a href="https://github.com/Cryptkeeper/Minetrack">Github</a></p>
-						<p class="text-uppercase">Made with <span style="color: #e74c3c;">&#9829;</span> by <a href="http://cryptkpr.me">Cryptkeeper</a></p>
-
-						<br />
-
-						<div id="category-controller">
-
-							<a class="text-uppercase" onclick="setCategoriesVisible(true);">Show Categories</a> // <a class="text-uppercase" onclick="setCategoriesVisible(false);">Hide Categories</a>
-
-						</div>
+						<div class="mojang-status" title="Sessions" id="mojang-status_Sessions"><i class="fa fa-gamepad"></i><br /><strong>Sessions</strong><p class="mojang-status-text" id="mojang-status-text_Sessions">...</p></div><div class="mojang-status" title="Skins" id="mojang-status_Skins"><i class="fa fa-user"></i><br /><strong>Skins</strong><p class="mojang-status-text" id="mojang-status-text_Skins">...</p></div><div class="mojang-status" title="Auth" id="mojang-status_Auth"><i class="fa fa-key"></i><br /><strong>Auth</strong><p class="mojang-status-text" id="mojang-status-text_Auth">...</p></div><div class="mojang-status" title="API" id="mojang-status_API"><i class="fa fa-wrench"></i><br /><strong>API</strong><p class="mojang-status-text" id="mojang-status-text_API">...</p></div>
 
 					</div>
 
@@ -49,11 +41,9 @@
 
 			</div>
 
-			<div id="tagline" class="status-connecting">
-				
-				<span id="tagline-text" class="text-uppercase">Connecting...</span>
+			<div id="perc-bar"></div>
 
-			</div>
+			<div id="tagline-text">Connecting...</div>
 
 			<div id="big-graph"></div>
 
@@ -64,7 +54,7 @@
 					<a onclick="toggleControlsDrawer();">Click to toggle graph controls</a>
 
 				</span>
-				
+
 				<div id="big-graph-controls-drawer" style="display: none;">
 
 					<div id="big-graph-checkboxes"></div>
@@ -88,15 +78,13 @@
 
         <div id="footer">
 
-        	Copyright &copy; 2016. All rights reserved. Logo copyrights belong to their respective owners.
+			<span style="padding-left: 20px;">Made with <span style="color: #e74c3c;">&#9829;</span> by <a href="http://cryptkpr.me">Cryptkeeper</a>. Source code available on <a href="https://github.com/Cryptkeeper/Minetrack"><i class="fa fa-github"></i> Github</a>. Older individual server records may not be reflected due to tracking behavior.</span>
 
-        </div>
+		</div>
 
         <!-- External JS assets -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
-
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.7/socket.io.min.js"></script>
-
         <script src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.min.js"></script>
 
         <!-- Internal JS assets -->
